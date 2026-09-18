@@ -44,9 +44,25 @@
   const ctx = canvas.getContext('2d');
   const appEl = document.getElementById('app');
 
+  // The game area is always rendered/laid out in a fixed 900x600 logical
+  // coordinate space (CANVAS_W x CANVAS_H); fitStage() scales that whole
+  // stage up or down via CSS transform to fill as much of the browser
+  // window as it can while preserving the 3:2 aspect ratio. The canvas's
+  // own backing-store resolution is boosted to match (scale * devicePixelRatio)
+  // so it stays crisp instead of blurring when stretched larger than 900x600.
+  let stageScale = 1;
+  let canvasPixelRatio = 1;
+
   function fitStage() {
-    const scale = Math.min(1, window.innerWidth / 920, window.innerHeight / 640);
-    appEl.style.transform = `scale(${scale})`;
+    const MAX_SCALE = 3.5; // safety clamp for pathologically large/high-DPI displays
+    stageScale = Math.min(window.innerWidth / CANVAS_W, window.innerHeight / CANVAS_H, MAX_SCALE);
+    appEl.style.transform = `scale(${stageScale})`;
+
+    canvasPixelRatio = (window.devicePixelRatio || 1) * stageScale;
+    canvas.width = Math.round(CANVAS_W * canvasPixelRatio);
+    canvas.height = Math.round(CANVAS_H * canvasPixelRatio);
+    canvas.style.width = CANVAS_W + 'px';
+    canvas.style.height = CANVAS_H + 'px';
   }
   window.addEventListener('resize', fitStage);
   fitStage();
@@ -420,6 +436,10 @@
   // Render
   // ---------------------------------------------------------------------
   function render(t) {
+    // Map logical 900x600 drawing coordinates onto the (possibly higher-res)
+    // backing store set up in fitStage(), so all draw calls below can stay
+    // written in logical units.
+    ctx.setTransform(canvasPixelRatio, 0, 0, canvasPixelRatio, 0, 0);
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
 
     ctx.save();
