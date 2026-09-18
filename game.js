@@ -7,7 +7,7 @@
   const CANVAS_W = 900;
   const CANVAS_H = 600;
   const PAD_Y = 520;              // y of the ground/pad surface
-  const GRAVITY = 28;             // px/s^2
+  let GRAVITY = 28;                // px/s^2, reassigned per-map in resetLander()
   const THRUST_FORCE = 95;        // px/s^2 at mass=1, throttle=100%
   const THROTTLE_RATE = 65;       // %/s ramp speed
   const ANGLE_RATE = 85;          // deg/s rotation speed
@@ -31,6 +31,52 @@
     2: { angleControl: true,  fuelLimit: false, randomMass: false, padWidth: 150, spawnRangeX: 260 },
     3: { angleControl: true,  fuelLimit: true,  randomMass: true,  padWidth: 160, spawnRangeX: 200 },
   };
+
+  // ---------------------------------------------------------------------
+  // Customization presets (ship / thrust color / map)
+  // ---------------------------------------------------------------------
+  const SHIP_DESIGNS = [
+    { id: 'classic', name: 'Classic Lander',  hullColor: '#d8e2f5', accentColor: '#4d7cff', legColor: '#9fb0d6', draw: (c) => drawHullClassic(c) },
+    { id: 'capsule', name: 'Apollo Capsule',  hullColor: '#e8e2d0', accentColor: '#ffd24d', legColor: '#b0a480', draw: (c) => drawHullCapsule(c) },
+    { id: 'shuttle', name: 'Delta Shuttle',   hullColor: '#d0d8e8', accentColor: '#4dd9ff', legColor: '#5f6f95', draw: (c) => drawHullShuttle(c) },
+    { id: 'saucer',  name: 'Saucer Disc',     hullColor: '#c9d4e8', accentColor: '#b34dff', legColor: '#9fb8e0', draw: (c) => drawHullSaucer(c) },
+    { id: 'rocket',  name: 'Cylinder Rocket', hullColor: '#d8dce2', accentColor: '#4dff88', legColor: '#b33d3d', draw: (c) => drawHullRocket(c) },
+  ];
+
+  const THRUST_PRESETS = [
+    { id: 'orange', name: 'Classic Orange',  core: '#fff2b0', mid: '#ff9a3d', tail: 'rgba(255,60,20,0)' },
+    { id: 'ion',    name: 'Blue Ion',        core: '#eaf6ff', mid: '#4da6ff', tail: 'rgba(20,80,255,0)' },
+    { id: 'plasma', name: 'Green Plasma',    core: '#eaffea', mid: '#4dff88', tail: 'rgba(20,180,60,0)' },
+    { id: 'exotic', name: 'Purple Exotic',   core: '#f5eaff', mid: '#b34dff', tail: 'rgba(120,20,200,0)' },
+    { id: 'after',  name: 'Red Afterburner', core: '#fff0ea', mid: '#ff4d4d', tail: 'rgba(200,20,20,0)' },
+    { id: 'white',  name: 'White-Hot',       core: '#ffffff', mid: '#cfe8ff', tail: 'rgba(200,220,255,0)' },
+  ];
+
+  // Gravity chosen thematically: asteroid (near-weightless) < ice (small icy
+  // moon) < lunar (today's original baseline) < mars < toxic (heaviest/hardest).
+  const MAP_PRESETS = [
+    { id: 'lunar',    name: 'Lunar Surface',       gravity: 28,
+      skyTop: '#05070d', skyBottom: '#0b1226', terrainFill: '#161d33', terrainStroke: '#2c3a63',
+      starColor: '#cfe0ff', starDensity: 140 },
+    { id: 'asteroid', name: 'Deep Space Asteroid', gravity: 12,
+      skyTop: '#020204', skyBottom: '#07080f', terrainFill: '#2a2a30', terrainStroke: '#45454f',
+      starColor: '#e8edf7', starDensity: 200 },
+    { id: 'ice',      name: 'Ice World',           gravity: 20,
+      skyTop: '#030a12', skyBottom: '#0a1c2e', terrainFill: '#1b3a4a', terrainStroke: '#2f5b6e',
+      starColor: '#d7f3ff', starDensity: 160 },
+    { id: 'mars',     name: 'Mars Basin',          gravity: 34,
+      skyTop: '#1a0805', skyBottom: '#3a140a', terrainFill: '#4a2418', terrainStroke: '#6b3624',
+      starColor: '#ffd9c2', starDensity: 90 },
+    { id: 'toxic',    name: 'Toxic Alien World',   gravity: 36,
+      skyTop: '#0a1006', skyBottom: '#16240a', terrainFill: '#24331a', terrainStroke: '#3c5426',
+      starColor: '#c8ff9a', starDensity: 100 },
+  ];
+
+  const DEFAULT_SETTINGS = {
+    shipId: 'classic', thrustId: 'orange', mapId: 'lunar',
+    craters: false, planets: false, shootingStars: false, nebula: false, asteroids: false,
+  };
+  const SETTINGS_KEY = 'landerSettings';
 
   const STATE = { MENU: 'menu', PLAYING: 'playing', PAUSED: 'paused', LANDED: 'landed', CRASHED: 'crashed', CRASH_ANIM: 'crash_anim' };
   const CRASH_ANIM_DURATION = 1.6; // seconds of debris animation before the end overlay appears
@@ -91,6 +137,38 @@
   const retryBtn = document.getElementById('retry-btn');
   const menuBtn = document.getElementById('menu-btn');
 
+  const customizeBtn = document.getElementById('customize-btn');
+  const customizerOverlay = document.getElementById('customizer-overlay');
+  const customizerBackBtn = document.getElementById('customizer-back-btn');
+  const shipOptionsEl = document.getElementById('ship-options');
+  const thrustOptionsEl = document.getElementById('thrust-options');
+  const mapOptionsEl = document.getElementById('map-options');
+  const toggleCraters = document.getElementById('toggle-craters');
+  const togglePlanets = document.getElementById('toggle-planets');
+  const toggleShooting = document.getElementById('toggle-shooting');
+  const toggleNebula = document.getElementById('toggle-nebula');
+  const toggleAsteroids = document.getElementById('toggle-asteroids');
+
+  // ---------------------------------------------------------------------
+  // Settings persistence
+  // ---------------------------------------------------------------------
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : { ...DEFAULT_SETTINGS };
+    } catch (e) {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ }
+  }
+
+  let settings = loadSettings();
+  let activeShip = SHIP_DESIGNS.find((s) => s.id === settings.shipId) || SHIP_DESIGNS[0];
+  let activeThrust = THRUST_PRESETS.find((t) => t.id === settings.thrustId) || THRUST_PRESETS[0];
+  let activeMap = MAP_PRESETS.find((m) => m.id === settings.mapId) || MAP_PRESETS[0];
+
   // ---------------------------------------------------------------------
   // Game state
   // ---------------------------------------------------------------------
@@ -110,9 +188,16 @@
   let pendingCrashMessage = '';
   let shakeMag = 0;
 
+  let craters = [];
+  let planets = [];
+  let nebulaClouds = [];
+  let asteroids = [];
+  let shootingStars = [];
+  let shootingStarTimer = 2;
+
   function makeStars() {
     const arr = [];
-    for (let i = 0; i < 140; i++) {
+    for (let i = 0; i < activeMap.starDensity; i++) {
       arr.push({
         x: Math.random() * CANVAS_W,
         y: Math.random() * (PAD_Y - 10),
@@ -150,10 +235,10 @@
   // trajectory exists for the randomly chosen mass, then adds a generous
   // safety margin for imperfect human piloting + horizontal correction.
   // ---------------------------------------------------------------------
-  function computeFuelBudget(mass, startAltitude) {
+  function computeFuelBudget(mass, startAltitude, gravity) {
     const aMax = THRUST_FORCE / mass;
-    const netDecel = Math.max(aMax - GRAVITY, 1);
-    const v0 = Math.sqrt(2 * GRAVITY * startAltitude * netDecel / aMax);
+    const netDecel = Math.max(aMax - gravity, 1);
+    const v0 = Math.sqrt(2 * gravity * startAltitude * netDecel / aMax);
     const tBurn = v0 / netDecel;
     const fuelMin = BURN_RATE * tBurn;
     return fuelMin * 3.2 + 45; // margin factor + flat buffer for maneuvering
@@ -161,9 +246,20 @@
 
   function resetLander() {
     cfg = LEVEL_CONFIG[level];
+    activeShip = SHIP_DESIGNS.find((s) => s.id === settings.shipId) || SHIP_DESIGNS[0];
+    activeThrust = THRUST_PRESETS.find((t) => t.id === settings.thrustId) || THRUST_PRESETS[0];
+    activeMap = MAP_PRESETS.find((m) => m.id === settings.mapId) || MAP_PRESETS[0];
+    GRAVITY = activeMap.gravity;
+
     const padCenter = CANVAS_W / 2;
     terrain = makeTerrain(padCenter, cfg.padWidth);
     stars = makeStars();
+    craters = makeCraters();
+    planets = makePlanets();
+    nebulaClouds = makeNebulaClouds();
+    asteroids = makeAsteroidField();
+    shootingStars = [];
+    shootingStarTimer = 1 + Math.random() * 2;
     debris = [];
     sparks = [];
     crashTimer = 0;
@@ -177,7 +273,7 @@
       ? +(MASS_MIN + Math.random() * (MASS_MAX - MASS_MIN)).toFixed(2)
       : 1.0;
 
-    const maxFuel = cfg.fuelLimit ? computeFuelBudget(mass, START_ALT) : Infinity;
+    const maxFuel = cfg.fuelLimit ? computeFuelBudget(mass, START_ALT, GRAVITY) : Infinity;
 
     lander = {
       x: spawnX,
@@ -215,6 +311,7 @@
   // Update
   // ---------------------------------------------------------------------
   function update(dt) {
+    updateDecorations(dt);
     if (state === STATE.CRASH_ANIM) { updateCrashAnimation(dt); return; }
     if (state !== STATE.PLAYING) return;
 
@@ -300,6 +397,17 @@
     return pts[pts.length - 1].y;
   }
 
+  // Darkens/lightens a #rrggbb hex color by `amt` (-1..1) — used to derive
+  // subtle hull-piece shading variants from a ship's single hullColor.
+  function shadeHex(hex, amt) {
+    const n = parseInt(hex.slice(1), 16);
+    const clamp = (v) => Math.max(0, Math.min(255, v));
+    const r = clamp(((n >> 16) & 0xff) + Math.round(255 * amt));
+    const g = clamp(((n >> 8) & 0xff) + Math.round(255 * amt));
+    const b = clamp((n & 0xff) + Math.round(255 * amt));
+    return `rgb(${r},${g},${b})`;
+  }
+
   function startCrashAnimation() {
     state = STATE.CRASH_ANIM;
     crashTimer = CRASH_ANIM_DURATION;
@@ -312,13 +420,14 @@
     // rotate a local-space point into world space at the lander's pose
     const toWorld = (lx, ly) => ({ x: L.x + lx * cos - ly * sin, y: L.y + lx * sin + ly * cos });
 
+    const hull = activeShip.hullColor;
     const PIECE_DEFS = [
-      { pts: [[0, -17], [8, -2], [-8, -2]], color: '#d8e2f5' },        // nose cone
-      { pts: [[-13, -2], [0, -2], [0, 11], [-13, 11]], color: '#c3cfe6' },  // left hull
-      { pts: [[0, -2], [13, -2], [13, 11], [0, 11]], color: '#aebbdb' },    // right hull
-      { pts: [[-13, 5], [-21, 19], [-9, 13]], color: '#9fb0d6' },       // left leg
-      { pts: [[13, 5], [21, 19], [9, 13]], color: '#9fb0d6' },         // right leg
-      { pts: [[-5, -8], [5, -8], [4, 2], [-4, 2]], color: '#4d7cff' },  // cockpit window
+      { pts: [[0, -17], [8, -2], [-8, -2]], color: shadeHex(hull, 0.06) },        // nose cone
+      { pts: [[-13, -2], [0, -2], [0, 11], [-13, 11]], color: shadeHex(hull, -0.05) },  // left hull
+      { pts: [[0, -2], [13, -2], [13, 11], [0, 11]], color: shadeHex(hull, -0.12) },    // right hull
+      { pts: [[-13, 5], [-21, 19], [-9, 13]], color: activeShip.legColor },       // left leg
+      { pts: [[13, 5], [21, 19], [9, 13]], color: activeShip.legColor },         // right leg
+      { pts: [[-5, -8], [5, -8], [4, 2], [-4, 2]], color: activeShip.accentColor },  // cockpit window
     ];
 
     debris = PIECE_DEFS.map((def) => {
@@ -455,13 +564,16 @@
 
     // sky gradient
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_H);
-    grad.addColorStop(0, '#05070d');
-    grad.addColorStop(1, '#0b1226');
+    grad.addColorStop(0, activeMap.skyTop);
+    grad.addColorStop(1, activeMap.skyBottom);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
+    if (settings.nebula) drawNebula(t);
+    if (settings.planets) drawPlanets();
+
     // stars
-    ctx.fillStyle = '#cfe0ff';
+    ctx.fillStyle = activeMap.starColor;
     for (const s of stars) {
       const twinkle = 0.6 + 0.4 * Math.sin(t / 500 + s.tw);
       ctx.globalAlpha = twinkle;
@@ -470,6 +582,9 @@
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+
+    if (settings.asteroids) drawAsteroidField();
+    if (settings.shootingStars) drawShootingStars();
 
     if (terrain) drawTerrain();
 
@@ -481,6 +596,193 @@
     }
 
     ctx.restore();
+  }
+
+  // ---------------------------------------------------------------------
+  // Decorative scene layers (all cosmetic — never touch terrain.points or
+  // any collision/physics state)
+  // ---------------------------------------------------------------------
+  function makeCraters() {
+    if (!terrain) return [];
+    const list = [];
+    const count = 6 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+      let x;
+      let attempts = 0;
+      do {
+        x = Math.random() * CANVAS_W;
+        attempts++;
+      } while (x > terrain.padLeft - 40 && x < terrain.padRight + 40 && attempts < 10);
+      if (x > terrain.padLeft - 40 && x < terrain.padRight + 40) continue;
+      const y = terrainHeightAt(x);
+      const rx = 8 + Math.random() * 18;
+      const ry = rx * (0.28 + Math.random() * 0.12);
+      list.push({ x, y, rx, ry });
+    }
+    return list;
+  }
+
+  function makePlanets() {
+    const count = 1 + Math.floor(Math.random() * 2);
+    const palette = ['#7f93bf', '#b39ddb', '#8fd0c9', '#d19a6a', '#c98fa0'];
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      const r = 18 + Math.random() * 30;
+      list.push({
+        x: 80 + Math.random() * (CANVAS_W - 160),
+        y: 40 + Math.random() * 160,
+        r,
+        color: palette[Math.floor(Math.random() * palette.length)],
+        ring: Math.random() < 0.3,
+      });
+    }
+    return list;
+  }
+
+  function makeNebulaClouds() {
+    const list = [];
+    const palette = ['rgba(180,120,255,0.10)', 'rgba(90,200,255,0.09)', 'rgba(255,120,180,0.08)'];
+    for (let i = 0; i < 4; i++) {
+      list.push({
+        x: Math.random() * CANVAS_W,
+        y: 30 + Math.random() * 260,
+        rx: 120 + Math.random() * 160,
+        ry: 50 + Math.random() * 60,
+        color: palette[i % palette.length],
+        drift: (Math.random() - 0.5) * 3,
+      });
+    }
+    return list;
+  }
+
+  function makeAsteroidField() {
+    const list = [];
+    const count = 10 + Math.floor(Math.random() * 6);
+    for (let i = 0; i < count; i++) {
+      const r = 3 + Math.random() * 6;
+      const pts = [];
+      const sides = 5 + Math.floor(Math.random() * 3);
+      for (let s = 0; s < sides; s++) {
+        const a = (s / sides) * Math.PI * 2;
+        const rr = r * (0.7 + Math.random() * 0.5);
+        pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+      }
+      list.push({
+        x: Math.random() * CANVAS_W,
+        y: 20 + Math.random() * 300,
+        pts,
+        angle: Math.random() * 360,
+        angularVel: (Math.random() - 0.5) * 20,
+        vx: (Math.random() - 0.5) * 12,
+        vy: (Math.random() - 0.5) * 4,
+      });
+    }
+    return list;
+  }
+
+  function updateDecorations(dt) {
+    if (settings.asteroids) {
+      for (const a of asteroids) {
+        a.x += a.vx * dt;
+        a.y += a.vy * dt;
+        a.angle += a.angularVel * dt;
+        if (a.x < -20) a.x = CANVAS_W + 20;
+        if (a.x > CANVAS_W + 20) a.x = -20;
+        if (a.y < -20) a.y = 320;
+        if (a.y > 320) a.y = -20;
+      }
+    }
+    if (settings.nebula) {
+      for (const n of nebulaClouds) {
+        n.x += n.drift * dt;
+        if (n.x < -200) n.x = CANVAS_W + 200;
+        if (n.x > CANVAS_W + 200) n.x = -200;
+      }
+    }
+    if (settings.shootingStars) {
+      shootingStarTimer -= dt;
+      if (shootingStarTimer <= 0) {
+        shootingStarTimer = 1.5 + Math.random() * 3;
+        const startX = Math.random() * CANVAS_W * 0.6;
+        shootingStars.push({
+          x: startX, y: 20 + Math.random() * 100,
+          vx: 260 + Math.random() * 140, vy: 90 + Math.random() * 50,
+          life: 0.6, age: 0,
+        });
+      }
+      for (const s of shootingStars) {
+        s.age += dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+      }
+      shootingStars = shootingStars.filter((s) => s.age < s.life);
+    }
+  }
+
+  function drawNebula(t) {
+    for (const n of nebulaClouds) {
+      const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.rx);
+      grad.addColorStop(0, n.color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.save();
+      ctx.translate(n.x, n.y);
+      ctx.scale(1, n.ry / n.rx);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, n.rx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawPlanets() {
+    for (const p of planets) {
+      if (p.ring) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(-0.35);
+        ctx.strokeStyle = 'rgba(230, 220, 200, 0.5)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.r * 1.7, p.r * 0.55, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    }
+  }
+
+  function drawAsteroidField() {
+    ctx.fillStyle = 'rgba(160, 160, 175, 0.55)';
+    for (const a of asteroids) {
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.angle * Math.PI / 180);
+      ctx.beginPath();
+      a.pts.forEach(([px, py], i) => (i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function drawShootingStars() {
+    for (const s of shootingStars) {
+      const life = 1 - s.age / s.life;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, life);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - s.vx * 0.05, s.y - s.vy * 0.05);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
   }
 
   function drawDebris() {
@@ -504,12 +806,24 @@
     for (const s of sparks) {
       const life = 1 - s.age / s.life;
       ctx.globalAlpha = Math.max(0, life);
-      ctx.fillStyle = life > 0.5 ? '#fff2b0' : '#ff9a3d';
+      ctx.fillStyle = life > 0.5 ? activeThrust.core : activeThrust.mid;
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
+  }
+
+  function drawCraters() {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.lineWidth = 1.5;
+    for (const c of craters) {
+      ctx.beginPath();
+      ctx.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, Math.PI);
+      ctx.fill();
+      ctx.stroke();
+    }
   }
 
   function drawTerrain() {
@@ -518,14 +832,16 @@
     for (const p of terrain.points) ctx.lineTo(p.x, p.y);
     ctx.lineTo(CANVAS_W, CANVAS_H);
     ctx.closePath();
-    ctx.fillStyle = '#161d33';
+    ctx.fillStyle = activeMap.terrainFill;
     ctx.fill();
-    ctx.strokeStyle = '#2c3a63';
+    ctx.strokeStyle = activeMap.terrainStroke;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(terrain.points[0].x, terrain.points[0].y);
     for (const p of terrain.points) ctx.lineTo(p.x, p.y);
     ctx.stroke();
+
+    if (settings.craters) drawCraters();
 
     // pad markers
     ctx.strokeStyle = '#6fe08a';
@@ -549,54 +865,188 @@
     ctx.translate(lander.x, lander.y);
     ctx.rotate(lander.angle * Math.PI / 180);
 
-    // flame
     const hasFuel = !cfg.fuelLimit || lander.fuel > 0;
-    if (lander.throttle > 4 && hasFuel && lander.engineOn) {
-      const flameLen = 10 + (lander.throttle / 100) * 26 * (0.7 + 0.3 * Math.random());
-      ctx.beginPath();
-      ctx.moveTo(-7, LANDER_H / 2);
-      ctx.lineTo(0, LANDER_H / 2 + flameLen);
-      ctx.lineTo(7, LANDER_H / 2);
-      ctx.closePath();
-      const fgrad = ctx.createLinearGradient(0, LANDER_H / 2, 0, LANDER_H / 2 + flameLen);
-      fgrad.addColorStop(0, '#fff2b0');
-      fgrad.addColorStop(0.5, '#ff9a3d');
-      fgrad.addColorStop(1, 'rgba(255,60,20,0)');
-      ctx.fillStyle = fgrad;
-      ctx.fill();
-    }
-
-    // body
-    ctx.beginPath();
-    ctx.moveTo(0, -LANDER_H / 2);
-    ctx.lineTo(LANDER_W / 2, LANDER_H / 2 - 6);
-    ctx.lineTo(LANDER_W / 2, LANDER_H / 2);
-    ctx.lineTo(-LANDER_W / 2, LANDER_H / 2);
-    ctx.lineTo(-LANDER_W / 2, LANDER_H / 2 - 6);
-    ctx.closePath();
-    ctx.fillStyle = '#d8e2f5';
-    ctx.fill();
-    ctx.strokeStyle = '#7f93bf';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // window
-    ctx.beginPath();
-    ctx.arc(0, -4, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#4d7cff';
-    ctx.fill();
-
-    // legs
-    ctx.strokeStyle = '#9fb0d6';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(-LANDER_W / 2, LANDER_H / 2 - 6);
-    ctx.lineTo(-LANDER_W / 2 - 8, LANDER_H / 2 + 8);
-    ctx.moveTo(LANDER_W / 2, LANDER_H / 2 - 6);
-    ctx.lineTo(LANDER_W / 2 + 8, LANDER_H / 2 + 8);
-    ctx.stroke();
+    const flameOn = lander.throttle > 4 && hasFuel && lander.engineOn;
+    const flameStrength = lander.throttle / 100;
+    drawFlame(ctx, activeThrust, flameOn, flameStrength);
+    (activeShip || SHIP_DESIGNS[0]).draw(ctx);
 
     ctx.restore();
+  }
+
+  // Shared flame — every ship design shares the same anchor/shape, only the
+  // color preset varies. `ctx` is passed explicitly so ship-preview canvases
+  // (which use their own 2D context) could reuse this too, though previews
+  // draw with flameOn=false.
+  function drawFlame(c, preset, on, strength) {
+    if (!on) return;
+    const flameLen = 10 + strength * 26 * (0.7 + 0.3 * Math.random());
+    c.beginPath();
+    c.moveTo(-7, LANDER_H / 2);
+    c.lineTo(0, LANDER_H / 2 + flameLen);
+    c.lineTo(7, LANDER_H / 2);
+    c.closePath();
+    const fgrad = c.createLinearGradient(0, LANDER_H / 2, 0, LANDER_H / 2 + flameLen);
+    fgrad.addColorStop(0, preset.core);
+    fgrad.addColorStop(0.5, preset.mid);
+    fgrad.addColorStop(1, preset.tail);
+    c.fillStyle = fgrad;
+    c.fill();
+  }
+
+  // Shared leg geometry — fixed anchor points so every ship's legs line up
+  // with the real collision footprint (LANDER_FOOT_X/Y) regardless of hull.
+  function drawLegs(c, color) {
+    c.strokeStyle = color;
+    c.lineWidth = 2;
+    c.beginPath();
+    c.moveTo(-LANDER_W / 2, LANDER_H / 2 - 6);
+    c.lineTo(-LANDER_W / 2 - 8, LANDER_H / 2 + 8);
+    c.moveTo(LANDER_W / 2, LANDER_H / 2 - 6);
+    c.lineTo(LANDER_W / 2 + 8, LANDER_H / 2 + 8);
+    c.stroke();
+  }
+
+  function drawHullClassic(c) {
+    const ship = SHIP_DESIGNS[0];
+    c.beginPath();
+    c.moveTo(0, -LANDER_H / 2);
+    c.lineTo(LANDER_W / 2, LANDER_H / 2 - 6);
+    c.lineTo(LANDER_W / 2, LANDER_H / 2);
+    c.lineTo(-LANDER_W / 2, LANDER_H / 2);
+    c.lineTo(-LANDER_W / 2, LANDER_H / 2 - 6);
+    c.closePath();
+    c.fillStyle = ship.hullColor;
+    c.fill();
+    c.strokeStyle = '#7f93bf';
+    c.lineWidth = 1.5;
+    c.stroke();
+
+    c.beginPath();
+    c.arc(0, -4, 5, 0, Math.PI * 2);
+    c.fillStyle = ship.accentColor;
+    c.fill();
+
+    drawLegs(c, ship.legColor);
+  }
+
+  function drawHullCapsule(c) {
+    const ship = SHIP_DESIGNS[1];
+    c.beginPath();
+    c.moveTo(0, -LANDER_H / 2);
+    c.quadraticCurveTo(LANDER_W / 2 + 2, -6, LANDER_W / 2 - 3, LANDER_H / 2);
+    c.lineTo(-(LANDER_W / 2 - 3), LANDER_H / 2);
+    c.quadraticCurveTo(-(LANDER_W / 2 + 2), -6, 0, -LANDER_H / 2);
+    c.closePath();
+    c.fillStyle = ship.hullColor;
+    c.fill();
+    c.strokeStyle = '#b0a480';
+    c.lineWidth = 1.5;
+    c.stroke();
+
+    c.beginPath();
+    c.arc(0, -6, 4.5, 0, Math.PI * 2);
+    c.fillStyle = ship.accentColor;
+    c.fill();
+
+    drawLegs(c, ship.legColor);
+  }
+
+  function drawHullShuttle(c) {
+    const ship = SHIP_DESIGNS[2];
+    // delta wings, drawn first so the fuselage overlaps their inner edge
+    c.beginPath();
+    c.moveTo(-6, 2);
+    c.lineTo(-(LANDER_W / 2 + 2), LANDER_H / 2 - 2);
+    c.lineTo(-6, LANDER_H / 2 - 2);
+    c.closePath();
+    c.moveTo(6, 2);
+    c.lineTo(LANDER_W / 2 + 2, LANDER_H / 2 - 2);
+    c.lineTo(6, LANDER_H / 2 - 2);
+    c.closePath();
+    c.fillStyle = '#5f6f95';
+    c.fill();
+
+    c.beginPath();
+    c.moveTo(0, -LANDER_H / 2);
+    c.lineTo(7, LANDER_H / 2 - 4);
+    c.lineTo(7, LANDER_H / 2);
+    c.lineTo(-7, LANDER_H / 2);
+    c.lineTo(-7, LANDER_H / 2 - 4);
+    c.closePath();
+    c.fillStyle = ship.hullColor;
+    c.fill();
+    c.strokeStyle = '#5f6f95';
+    c.lineWidth = 1.5;
+    c.stroke();
+
+    c.beginPath();
+    c.arc(0, -2, 4, 0, Math.PI * 2);
+    c.fillStyle = ship.accentColor;
+    c.fill();
+
+    drawLegs(c, ship.legColor);
+  }
+
+  function drawHullSaucer(c) {
+    const ship = SHIP_DESIGNS[3];
+    c.beginPath();
+    c.ellipse(0, 2, LANDER_W / 2 + 2, 7, 0, 0, Math.PI * 2);
+    c.fillStyle = ship.hullColor;
+    c.fill();
+    c.strokeStyle = '#9fb8e0';
+    c.lineWidth = 1.5;
+    c.stroke();
+
+    c.beginPath();
+    c.arc(0, -4, 8, Math.PI, 0);
+    c.closePath();
+    c.fillStyle = '#9fb8e0';
+    c.fill();
+
+    c.beginPath();
+    c.arc(0, -4, 4, 0, Math.PI * 2);
+    c.fillStyle = ship.accentColor;
+    c.fill();
+
+    drawLegs(c, ship.legColor);
+  }
+
+  function drawHullRocket(c) {
+    const ship = SHIP_DESIGNS[4];
+    // fins
+    c.beginPath();
+    c.moveTo(-6, LANDER_H / 2 - 10);
+    c.lineTo(-(LANDER_W / 2 + 2), LANDER_H / 2);
+    c.lineTo(-6, LANDER_H / 2);
+    c.closePath();
+    c.moveTo(6, LANDER_H / 2 - 10);
+    c.lineTo(LANDER_W / 2 + 2, LANDER_H / 2);
+    c.lineTo(6, LANDER_H / 2);
+    c.closePath();
+    c.fillStyle = ship.legColor;
+    c.fill();
+
+    // cylindrical body with a pointed nose
+    c.beginPath();
+    c.moveTo(0, -LANDER_H / 2);
+    c.lineTo(6, -LANDER_H / 2 + 10);
+    c.lineTo(6, LANDER_H / 2 - 2);
+    c.lineTo(-6, LANDER_H / 2 - 2);
+    c.lineTo(-6, -LANDER_H / 2 + 10);
+    c.closePath();
+    c.fillStyle = ship.hullColor;
+    c.fill();
+    c.strokeStyle = '#9aa0ab';
+    c.lineWidth = 1.5;
+    c.stroke();
+
+    c.beginPath();
+    c.arc(0, -6, 3.5, 0, Math.PI * 2);
+    c.fillStyle = ship.accentColor;
+    c.fill();
+
+    drawLegs(c, ship.legColor);
   }
 
   // ---------------------------------------------------------------------
@@ -634,7 +1084,7 @@
       e.preventDefault();
       return;
     }
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+    if (state === STATE.PLAYING && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
       e.preventDefault();
     }
   });
@@ -678,6 +1128,88 @@
     state = STATE.MENU;
     endOverlay.classList.add('hidden');
     menuOverlay.classList.remove('hidden');
+  });
+
+  // ---------------------------------------------------------------------
+  // Customizer
+  // ---------------------------------------------------------------------
+  function openCustomizer() {
+    renderCustomizerOptions();
+    toggleCraters.checked = settings.craters;
+    togglePlanets.checked = settings.planets;
+    toggleShooting.checked = settings.shootingStars;
+    toggleNebula.checked = settings.nebula;
+    toggleAsteroids.checked = settings.asteroids;
+    menuOverlay.classList.add('hidden');
+    customizerOverlay.classList.remove('hidden');
+  }
+
+  function renderCustomizerOptions() {
+    shipOptionsEl.innerHTML = SHIP_DESIGNS.map((s) =>
+      `<button class="option-btn ${s.id === settings.shipId ? 'selected' : ''}" data-ship="${s.id}">` +
+      `<canvas class="ship-preview" width="50" height="50"></canvas><span>${s.name}</span></button>`
+    ).join('');
+    shipOptionsEl.querySelectorAll('button').forEach((btn) => {
+      const design = SHIP_DESIGNS.find((s) => s.id === btn.dataset.ship);
+      const pctx = btn.querySelector('canvas').getContext('2d');
+      pctx.save();
+      pctx.translate(25, 32);
+      design.draw(pctx);
+      pctx.restore();
+      btn.addEventListener('click', () => {
+        settings.shipId = design.id;
+        activeShip = design;
+        saveSettings();
+        renderCustomizerOptions();
+      });
+    });
+
+    thrustOptionsEl.innerHTML = THRUST_PRESETS.map((p) =>
+      `<button class="option-btn ${p.id === settings.thrustId ? 'selected' : ''}" data-thrust="${p.id}">` +
+      `<div class="swatch" style="background:radial-gradient(circle, ${p.core}, ${p.mid})"></div><span>${p.name}</span></button>`
+    ).join('');
+    thrustOptionsEl.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const p = THRUST_PRESETS.find((x) => x.id === btn.dataset.thrust);
+        settings.thrustId = p.id;
+        activeThrust = p;
+        saveSettings();
+        renderCustomizerOptions();
+      });
+    });
+
+    mapOptionsEl.innerHTML = MAP_PRESETS.map((m) =>
+      `<button class="option-btn ${m.id === settings.mapId ? 'selected' : ''}" data-map="${m.id}">` +
+      `<div class="map-swatch" style="background:linear-gradient(180deg, ${m.skyTop}, ${m.terrainFill})"></div><span>${m.name}</span></button>`
+    ).join('');
+    mapOptionsEl.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const m = MAP_PRESETS.find((x) => x.id === btn.dataset.map);
+        settings.mapId = m.id;
+        activeMap = m;
+        saveSettings();
+        renderCustomizerOptions();
+      });
+    });
+  }
+
+  customizeBtn.addEventListener('click', openCustomizer);
+  customizerBackBtn.addEventListener('click', () => {
+    customizerOverlay.classList.add('hidden');
+    menuOverlay.classList.remove('hidden');
+  });
+
+  [
+    [toggleCraters, 'craters'],
+    [togglePlanets, 'planets'],
+    [toggleShooting, 'shootingStars'],
+    [toggleNebula, 'nebula'],
+    [toggleAsteroids, 'asteroids'],
+  ].forEach(([el, key]) => {
+    el.addEventListener('change', () => {
+      settings[key] = el.checked;
+      saveSettings();
+    });
   });
 
   // initial render (menu background)

@@ -48,11 +48,46 @@
           <span>Adds fuel limits &amp; random mass.</span>
         </button>
       </div>
+      <div class="menu-actions">
+        <button id="customize-btn" class="customize-btn">Customize Ship &amp; Scene</button>
+      </div>
       <div class="instructions">
         <strong>Controls</strong><br>
         Space — engine on / off &nbsp;&middot;&nbsp; &uarr; — increase throttle &nbsp;&middot;&nbsp; &darr; — decrease throttle<br>
         &larr; rotate left &nbsp;&middot;&nbsp; &rarr; rotate right (Level 2+)<br>
         R — restart &nbsp;&middot;&nbsp; P — pause
+      </div>
+    </div>
+
+    <!-- Customizer overlay -->
+    <div id="customizer-overlay" class="overlay hidden">
+      <h1 class="customizer-title">Customize</h1>
+      <div class="customizer-body">
+        <div class="customizer-section">
+          <div class="customizer-label">Ship Design</div>
+          <div class="option-grid" id="ship-options"></div>
+        </div>
+        <div class="customizer-section">
+          <div class="customizer-label">Thrust Color</div>
+          <div class="option-grid swatch-grid" id="thrust-options"></div>
+        </div>
+        <div class="customizer-section">
+          <div class="customizer-label">Map</div>
+          <div class="option-grid" id="map-options"></div>
+        </div>
+        <div class="customizer-section">
+          <div class="customizer-label">Scene Toggles</div>
+          <div class="toggle-row">
+            <label><input type="checkbox" id="toggle-craters"> Craters</label>
+            <label><input type="checkbox" id="toggle-planets"> Planets</label>
+            <label><input type="checkbox" id="toggle-shooting"> Shooting Stars</label>
+            <label><input type="checkbox" id="toggle-nebula"> Nebula</label>
+            <label><input type="checkbox" id="toggle-asteroids"> Asteroid Field</label>
+          </div>
+        </div>
+      </div>
+      <div class="end-buttons">
+        <button id="customizer-back-btn">Save &amp; Back</button>
       </div>
     </div>
 
