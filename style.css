@@ -1,0 +1,232 @@
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #05070d;
+  color: #e8edf7;
+  font-family: 'Times New Roman', Times, serif;
+  overflow: hidden;
+  height: 100%;
+}
+
+#stage-wrapper {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app {
+  position: relative;
+  width: 900px;
+  height: 600px;
+  flex: none;
+  box-shadow: 0 0 0 2px #1c2740, 0 20px 60px rgba(0,0,0,0.6);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  background: #05070d;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(8, 12, 24, 0.72);
+  border: 1px solid rgba(120, 160, 230, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  min-width: 150px;
+  backdrop-filter: blur(2px);
+}
+
+.hud-row .label {
+  display: inline-block;
+  width: 72px;
+  color: #7f93bf;
+}
+
+#hud-alt, #hud-vspeed, #hud-hspeed, #hud-angle, #hud-fuel, #hud-mass {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+#throttle-wrap {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(8, 12, 24, 0.72);
+  border: 1px solid rgba(120, 160, 230, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  width: 110px;
+  text-align: center;
+  font-size: 12px;
+}
+
+#throttle-wrap .label {
+  color: #7f93bf;
+  margin-bottom: 6px;
+}
+
+#throttle-bar {
+  width: 100%;
+  height: 90px;
+  background: #0d1424;
+  border: 1px solid rgba(120, 160, 230, 0.25);
+  border-radius: 4px;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+#throttle-fill {
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(180deg, #ff8a3d, #ff3d3d);
+  transition: height 0.05s linear;
+}
+
+#throttle-pct {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+#engine-status {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 0;
+  border-radius: 4px;
+}
+
+#engine-status.engine-on {
+  color: #6fe08a;
+  background: rgba(111, 224, 138, 0.12);
+}
+
+#engine-status.engine-off {
+  color: #ff6d6d;
+  background: rgba(255, 109, 109, 0.12);
+}
+
+#controls-legend {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  font-size: 11px;
+  color: #5f7099;
+  background: rgba(8, 12, 24, 0.6);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 12, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+.overlay.hidden {
+  display: none;
+}
+
+.overlay h1 {
+  font-size: 34px;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.subtitle {
+  color: #8ea0c9;
+  margin-top: -4px;
+}
+
+.level-select {
+  display: flex;
+  gap: 14px;
+  margin: 18px 0 8px;
+}
+
+.level-btn {
+  background: #101a30;
+  border: 1px solid rgba(120, 160, 230, 0.35);
+  color: #e8edf7;
+  padding: 14px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 170px;
+  font-size: 13px;
+  transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.level-btn strong {
+  font-size: 16px;
+  color: #ffb35c;
+}
+
+.level-btn span {
+  color: #9fb0d6;
+  line-height: 1.4;
+}
+
+.level-btn:hover {
+  background: #172445;
+  border-color: #4d7cff;
+  transform: translateY(-2px);
+}
+
+.instructions {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #7f93bf;
+  line-height: 1.8;
+}
+
+#end-message {
+  color: #b9c6e6;
+  max-width: 480px;
+}
+
+.end-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.end-buttons button, #retry-btn, #menu-btn {
+  background: #172445;
+  border: 1px solid rgba(120, 160, 230, 0.35);
+  color: #e8edf7;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.end-buttons button:hover {
+  background: #223262;
+  border-color: #4d7cff;
+}
+
+#end-title.success { color: #6fe08a; }
+#end-title.fail { color: #ff5d5d; }

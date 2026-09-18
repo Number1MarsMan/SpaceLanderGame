@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunar Descent</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="stage-wrapper">
+  <div id="app">
+    <canvas id="game" width="900" height="600"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-row"><span class="label">Altitude</span><span id="hud-alt">0</span> m</div>
+      <div class="hud-row"><span class="label">V-Speed</span><span id="hud-vspeed">0.0</span> m/s</div>
+      <div class="hud-row" id="hud-hspeed-row"><span class="label">H-Speed</span><span id="hud-hspeed">0.0</span> m/s</div>
+      <div class="hud-row" id="hud-angle-row"><span class="label">Angle</span><span id="hud-angle">0</span>&deg;</div>
+      <div class="hud-row" id="hud-fuel-row"><span class="label">Fuel</span><span id="hud-fuel">100</span>%</div>
+      <div class="hud-row" id="hud-mass-row"><span class="label">Mass</span><span id="hud-mass">1.0</span>x</div>
+    </div>
+
+    <div id="throttle-wrap">
+      <div class="label">Throttle</div>
+      <div id="throttle-bar"><div id="throttle-fill"></div></div>
+      <div id="throttle-pct">0%</div>
+      <div id="engine-status" class="engine-off">ENGINE OFF</div>
+    </div>
+
+    <div id="controls-legend"></div>
+
+    <!-- Menu overlay -->
+    <div id="menu-overlay" class="overlay">
+      <h1>Lunar Descent</h1>
+      <p class="subtitle">Guide your lander safely onto the pad.</p>
+      <div class="level-select">
+        <button class="level-btn" data-level="1">
+          <strong>Level 1</strong>
+          <span>Throttle only — straight down.</span>
+        </button>
+        <button class="level-btn" data-level="2">
+          <strong>Level 2</strong>
+          <span>Throttle + Angle control.</span>
+        </button>
+        <button class="level-btn" data-level="3">
+          <strong>Level 3</strong>
+          <span>Adds fuel limits &amp; random mass.</span>
+        </button>
+      </div>
+      <div class="instructions">
+        <strong>Controls</strong><br>
+        Space — engine on / off &nbsp;&middot;&nbsp; &uarr; — increase throttle &nbsp;&middot;&nbsp; &darr; — decrease throttle<br>
+        &larr; rotate left &nbsp;&middot;&nbsp; &rarr; rotate right (Level 2+)<br>
+        R — restart &nbsp;&middot;&nbsp; P — pause
+      </div>
+    </div>
+
+    <!-- End-of-run overlay -->
+    <div id="end-overlay" class="overlay hidden">
+      <h1 id="end-title">Landed!</h1>
+      <p id="end-message"></p>
+      <div class="end-buttons">
+        <button id="retry-btn">Retry</button>
+        <button id="menu-btn">Main Menu</button>
+      </div>
+    </div>
+
+    <div id="pause-overlay" class="overlay hidden">
+      <h1>Paused</h1>
+      <p>Press P to resume</p>
+    </div>
+  </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
