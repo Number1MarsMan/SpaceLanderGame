@@ -199,10 +199,16 @@
     hudFuelRow.style.display = cfg.fuelLimit ? '' : 'none';
     hudMassRow.style.display = cfg.randomMass ? '' : 'none';
 
-    let legend = 'Space engine on/off &nbsp; &uarr; throttle up &nbsp; &darr; throttle down';
-    if (cfg.angleControl) legend += ' &nbsp; &larr; rotate left &nbsp; &rarr; rotate right';
-    legend += ' &nbsp; R restart &nbsp; P pause';
-    controlsLegend.innerHTML = legend;
+    const rows = [
+      { label: 'Engine', key: 'Space' },
+      { label: 'Throttle', key: '&uarr; / &darr;' },
+    ];
+    if (cfg.angleControl) rows.push({ label: 'Rotate', key: '&larr; / &rarr;' });
+    rows.push({ label: 'Restart', key: 'R' });
+    rows.push({ label: 'Pause', key: 'P' });
+
+    controlsLegend.innerHTML = '<div class="legend-title">Controls</div>' +
+      rows.map((r) => `<div class="ctrl-row"><span class="label">${r.label}</span><span class="ctrl-key">${r.key}</span></div>`).join('');
   }
 
   // ---------------------------------------------------------------------

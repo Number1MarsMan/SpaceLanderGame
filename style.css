@@ -23,7 +23,8 @@ html, body {
   width: 900px;
   height: 600px;
   flex: none;
-  box-shadow: 0 0 0 2px #1c2740, 0 20px 60px rgba(0,0,0,0.6);
+  border: 2px solid #1c2740;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -121,13 +122,43 @@ canvas {
 
 #controls-legend {
   position: absolute;
-  bottom: 10px;
+  bottom: 12px;
   left: 12px;
-  font-size: 11px;
-  color: #5f7099;
-  background: rgba(8, 12, 24, 0.6);
-  padding: 6px 10px;
-  border-radius: 6px;
+  width: 168px;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+  background: rgba(8, 12, 24, 0.72);
+  border: 1px solid rgba(120, 160, 230, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  backdrop-filter: blur(2px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.legend-title {
+  color: #7f93bf;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.ctrl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ctrl-row .label {
+  color: #7f93bf;
+}
+
+.ctrl-key {
+  font-weight: 600;
+  color: #e8edf7;
 }
 
 .overlay {
